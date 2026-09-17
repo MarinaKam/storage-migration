@@ -5,8 +5,6 @@ Current functionality: local configuration, bucket access checks, metadata inven
 manifest reconciliation and resumable local image downloads with live progress.
 R2 uploads and database restore commands are not implemented yet.
 
-For the Russian setup guide, open [README.html](README.html).
-
 ## Quick start
 
 Install Python **3.14** if it is not already available, then open a terminal in
@@ -86,7 +84,7 @@ If hidden-input fallback is reported, stop and use an interactive terminal.
 
 Intended public files:
 
-- `README.md`, `README.html`
+- `README.md`
 - `pyproject.toml`, `.python-version`, `Makefile`, `.gitignore`
 - `scripts/` source code
 
@@ -195,7 +193,7 @@ Bounds: four workers, 30-second socket timeout, 25 MiB per object; at most
 204 selected objects per invocation (5 GiB worst-case response-body budget).
 `make download LIMIT=100` changes the batch size. HTTP/library overhead is not
 part of the body budget. Source service billing may apply.
-Private journals and Russian HTML summaries appear in `reports/download-*/`.
+Private journals and HTML summaries appear in `reports/download-*/`.
 Existing files are only present-unverified; these checks do not prove their
 integrity, source immutability or remote R2 restore. No automatic sorting occurs.
 

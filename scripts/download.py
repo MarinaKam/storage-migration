@@ -168,10 +168,9 @@ def main():
                     print(flush=True)
     good = sum(r['status'] == 'downloaded' for r in results)
     failed = len(results) - good
-    page = '''<!doctype html><html lang="ru"><meta charset="utf-8"><title>Докачивание фотографий</title><style>body{font:18px/1.6 system-ui;max-width:900px;margin:40px auto;padding:24px}td{padding:8px}</style><h1>Докачивание фотографий</h1>'''
-    page += f'<p>Скачано: {good}. Ошибок: {failed}. Выбрано для этого запуска: {len(chosen)}. Не выбрано: {len(missing)-len(chosen)}.</p>'
-    page += '<p>Новые файлы декодированы, SHA-256 прочитанной локальной копии совпал с полученными байтами. Это не доказывает неизменность удалённого источника или наличие копий в R2. Ранее существовавшие файлы не проверялись и не перезаписывались. Формат исходных байтов сохранён; суффикс .jpg соответствует соглашению существующего инструмента оценки.</p>'
-    page += '<p>Повторный запуск пропускает существующие файлы. После аварии файл, опубликованный до записи журнала, будет существующим непроверенным файлом. Скрытый временный файл после принудительного завершения не считается готовым фото. Автоматического удаления исходных файлов нет.</p><p><a href="journal.jsonl">Журнал</a></p><table>'
+    page = '<!doctype html><html lang="en"><meta charset="utf-8"><title>Image download</title><h1>Image download</h1>'
+    page += f'<p>Downloaded: {good}. Failed: {failed}. Selected: {len(chosen)}. Not selected: {len(missing)-len(chosen)}.</p>'
+    page += '<p>New files were decoded and their local read-back hashes matched the received bytes. This does not prove source immutability or remote R2 integrity. Existing files were not verified or overwritten. Original bytes are preserved; filenames use the .jpg convention regardless of format.</p><p>Reruns skip existing files. A crash after publication but before journaling can leave an existing unverified file. Hidden temporary files are not treated as completed images. No original files are deleted.</p><p><a href="journal.jsonl">Local journal</a></p><table>'
     page += ''.join('<tr><td>'+html.escape(r['image_id'])+'</td><td>'+html.escape(r['status'])+'</td></tr>' for r in results)
     (dest / 'download.html').write_text(page + '</table></html>')
     print(f'Downloaded: {good}; failed: {failed}; remaining at least: {len(missing)-good}')
