@@ -1,0 +1,10 @@
+[project]
+name = "storage-migration"
+version = "0.1.0"
+description = "Local tools for verified migration of retained project data"
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+dependencies = ["boto3==1.43.96", "Pillow==12.3.0"]
+
+[tool.uv]
+package = false

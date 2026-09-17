@@ -1,0 +1,11 @@
+# Only generic source and documentation are eligible for publication.
+/*
+!/.gitignore
+!/.python-version
+!/Makefile
+!/pyproject.toml
+!/README.md
+!/README.html
+!/scripts/
+/scripts/*
+!/scripts/*.py
