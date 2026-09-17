@@ -8,3 +8,10 @@ dependencies = ["boto3==1.43.96", "Pillow==12.3.0"]
 
 [tool.uv]
 package = false
+
+[project.optional-dependencies]
+dev = ["ruff==0.16.4"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100

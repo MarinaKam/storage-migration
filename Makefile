@@ -3,6 +3,11 @@ VENV_PYTHON := .venv/bin/python
 
 .PHONY: help setup deps check configure check-r2
 help:
+	@echo "make dev           Install development tools into .venv"
+	@echo "make ci            Run local checks and offline tests"
+	@echo "make r2-plan       Show the local R2 migration plan; no network"
+	@echo "make r2-transfer   Copy the dataset to R2 and verify by read-back"
+	@echo "make download-all  Download every missing image with live progress"
 	@echo "make download   Download up to 20 missing images locally; source network calls"
 	@echo "make reconcile  Match manifest IDs to local image filenames, offline"
 	@echo "make inventory  Inventory local metadata; no cloud calls"
@@ -40,3 +45,35 @@ LIMIT ?= 20
 .PHONY: download
 download:
 	@$(VENV_PYTHON) scripts/download.py --limit $(LIMIT)
+
+.PHONY: download-all
+download-all:
+	@$(VENV_PYTHON) scripts/download.py --all
+
+.PHONY: r2-plan r2-transfer
+r2-plan:
+	@$(VENV_PYTHON) scripts/r2_transfer.py --plan
+
+r2-transfer:
+	@$(VENV_PYTHON) scripts/r2_transfer.py --all
+
+.PHONY: test-r2
+test-r2:
+	@$(VENV_PYTHON) scripts/test_r2_transfer.py
+
+.PHONY: dev lint test check-public ci
+dev:
+	@$(VENV_PYTHON) scripts/install_dependencies.py --dev
+
+lint:
+	@$(VENV_PYTHON) -m ruff check scripts
+	@$(VENV_PYTHON) -m ruff format --check scripts
+
+test:
+	@$(VENV_PYTHON) scripts/run_tests.py
+
+check-public:
+	@$(VENV_PYTHON) scripts/check_public.py
+
+ci: check check-public lint test
+	@$(VENV_PYTHON) -m pip check

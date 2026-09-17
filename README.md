@@ -3,7 +3,8 @@
 A small Python 3.14 project for preparing verified object-storage migrations.
 Current functionality: local configuration, bucket access checks, metadata inventory,
 manifest reconciliation and resumable local image downloads with live progress.
-R2 uploads and database restore commands are not implemented yet.
+Direct R2 migration with read-back verification is available. Database restore
+commands are not implemented yet.
 
 ## Quick start
 
@@ -122,8 +123,7 @@ file list and diff. No remote or push is configured by the setup commands.
 
 ## Future migration commands
 
-R2 upload, remote read-back verification and consistent database restore are
-not implemented yet. Upload requires an exact approved source list,
+Consistent database restore is not implemented yet. Upload requires an exact approved source list,
 permission to store those files remotely and a bounded budget. Deletion requires
 separate approval of an exact list after verification.
 
@@ -184,8 +184,9 @@ Original bytes are preserved, with `<image_id>.jpg` filenames matching the
 existing evaluation tool, regardless of actual image format. New files must
 decode and pass a local SHA-256 read-back before atomic no-overwrite publication.
 Temporary files are hidden; interrupted transfers are not final images. Re-run
-the command to continue; failed requests remain missing. There are no automatic
-request retries. A forced process termination may leave hidden `.part` files.
+the command to continue; failed requests remain missing. Connection setup failures receive up to three attempts with 2- and 4-second
+backoff. HTTP errors, TLS errors, response-body failures and local failures are
+not retried automatically. Retry counts and sanitized error categories are logged. A forced process termination may leave hidden `.part` files.
 An exclusive lock prevents concurrent invocations from this project. Concurrent
 external writers to the image directory are outside this tool's threat boundary.
 
@@ -218,3 +219,106 @@ The existing image directory must already exist. CSV columns `image_id` and
 `s3_url` are required. IDs must contain only letters, digits, underscores or
 hyphens. Configuration examples are placeholders, not working source addresses.
 These local settings are never required in the public repository.
+
+## Download all remaining images
+
+Run `make download-all` for one pass over every missing image in the configured
+manifest. This explicitly selects the full remaining dataset rather than a
+limited batch: the 5 GiB worst-case batch selection cap does not apply.
+The 25 MiB per-image limit, four workers, connection retries, source-host checks
+and no-overwrite behavior remain in effect. Total transfer size is unknown in
+advance. No R2 calls occur. Progress covers all images selected for this run.
+
+Only four tasks are submitted at a time. An unsuccessful image is recorded and
+the command continues to later images; it does not get stuck repeating the same
+failed batch. Failures remaining after the bounded connection retries produce
+exit code 2 at the end. Re-run the same command to attempt remaining files.
+Ctrl+C stops scheduling new images; active requests may take time to finish.
+Already saved images stay in place and are skipped on the next invocation.
+
+## Direct transfer to R2
+
+`make r2-plan` reads the local manifest and metadata and prints the destination
+and source counts without network calls. `make r2-transfer` then processes the
+whole dataset in one invocation. The operator runs both commands.
+
+Connection settings remain in `.local/credentials.json`. Dataset paths and
+source-host restrictions remain in `.local/dataset.json`. Add ignored
+`.local/r2-transfer.json` with this structure, using your own absolute paths:
+
+```json
+{
+  "prefix": "dataset",
+  "metadata_files": ["/path/to/dataset/manifest.csv", "/path/to/dataset/tags.json"]
+}
+```
+
+The explicit metadata list must include the exact dataset manifest. Objects use
+`<prefix>/metadata/<filename>` and `<prefix>/images/<image_id><source-extension>`.
+Metadata is copied byte-for-byte. Tags and group assignments are not regenerated.
+URLs in metadata remain the original URLs; consumers must map image IDs to the
+new keys. Original bytes are preserved, including local images named `.jpg` that
+actually contain another supported image format. Content-Type comes from decoding.
+
+Existing local image files are checked for stable reads and decoded. They are
+operator-controlled inputs: decoding does not prove equality with source S3.
+Missing local images are fetched into bounded memory, never saved as local photos.
+Each image is limited to 25 MiB; metadata files to 100 MiB; four images run at once.
+Decoded images can use more memory than compressed response bytes. There is no
+total dataset byte limit or enforced currency cap; source GET and R2 operations
+are billed according to the configured services. No compute service is deployed.
+
+An existing remote object's bytes must match; conflicting objects are never
+overwritten. New objects use conditional `If-None-Match: *` writes, then a full
+remote GET and SHA-256 comparison. ETags and user-supplied remote hash metadata
+are not accepted as proof. Support is documented in the
+[Cloudflare S3 compatibility table](https://developers.cloudflare.com/r2/api/s3/api/).
+
+Private receipts under `.local/r2-state/` bind the manifest/metadata snapshot,
+destination, key, source-URL digest, content hash and size. Resume re-reads remote
+bytes against those receipts; it does not fetch the original URL again for an
+already verified object. Therefore resume verifies the recorded snapshot, not
+that a mutable original URL still serves the same content today. Receipts and
+local sources are trusted operator-owned state. A changed local file, changed
+remote object or metadata conflict is not silently accepted. Keep the receipts.
+A lost receipt causes the source to be read again and compared with R2.
+
+Ctrl+C stops scheduling new work and lets active requests finish or time out.
+Repeated Ctrl+C prints the stopping message without a traceback. No files are
+deleted. JSONL journals stay under `logs/`; no HTML/PDF is generated or opened.
+Exit 2 means some image transfers failed; retry the same command. Metadata failure
+stops before photos. All failures require review before declaring a full migration.
+Live R2 upload, actual service behavior and downstream application consumption
+have not been exercised by the preparation checks. A verified stored copy is not
+a database restore, retention guarantee, or permission to delete local sources.
+
+Run `make test-r2` for offline tests using generated fixtures and an in-memory
+S3 double. They cover plan-to-metadata-to-image transfer, resume, byte corruption,
+conditional-write races, lost upload acknowledgements, access denial, invalid
+images, source restrictions and duplicate identities. They make no network calls.
+
+Source URLs without a filename extension are supported: their R2 key is
+`<prefix>/images/<image_id>` without an invented suffix. The image content is
+still decoded and Content-Type comes from its actual format.
+
+## Continuous integration
+
+GitHub Actions runs on pushes to main, pull requests and manual dispatch.
+The single Python 3.14 job checks dependency consistency, public file scope,
+syntax, Ruff lint, Ruff formatting and offline tests. It has read-only repository
+permissions, uses no private checkout or user secrets, and does not upload data.
+Dependency installation requires network access; test socket connections are
+blocked and fixtures are generated in temporary directories.
+
+Run the same checks locally:
+
+```sh
+make dev
+make ci
+```
+
+Ruff installs into this project's .venv. Public-file checks reject unexpected
+tracked files, personal absolute paths, Cyrillic content and private-key blocks.
+They are a limited working-tree check, not a complete secret scanner.
+The workflow becomes active after it is committed and pushed. Requiring the
+`Python 3.14 checks` status before merge is a separate repository ruleset setting.
