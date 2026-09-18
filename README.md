@@ -396,3 +396,30 @@ Archive and database checks do not authorize cleanup. Required remaining gates
 are actual application reads from the new stores, restart with old data paths
 unavailable, preservation of active document/code references, and a separately
 approved file-by-file deletion list with byte totals. No deletion command exists.
+
+
+## Railway SSH tunnel
+
+`make tunnel` opens a foreground SSH tunnel for local migration and application
+verification. Keep its terminal open while using the database; Ctrl+C closes
+this tunnel. It does not start Docker, restore databases, read `.env`, or create
+a public TCP proxy. It never stops an existing listener on the requested port.
+Railway CLI must already be installed and authenticated, with SSH access ready.
+
+Create ignored `.local/tunnel.json` with your own destination:
+
+```json
+{
+  "project": "00000000-0000-0000-0000-000000000000",
+  "environment": "staging",
+  "service": "postgres-staging",
+  "port": 15432
+}
+```
+
+Replace the placeholder project UUID. No password belongs in this file.
+`make tunnel-check` checks local settings, CLI presence and port availability only;
+it does not authenticate or contact Railway. An occupied port is reported without
+assuming it belongs to Railway. The CLI performs the final bind, so a concurrent
+port claim can still prevent startup. Database clients keep their own credentials
+and database name; this tunnel does not select a database.

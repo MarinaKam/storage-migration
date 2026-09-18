@@ -3,6 +3,7 @@ VENV_PYTHON := .venv/bin/python
 
 .PHONY: help setup deps check configure check-r2
 help:
+	@echo "make tunnel     Open the configured Railway SSH tunnel; Ctrl+C closes it"
 	@echo "make archive-plan  List other local archive candidates; no upload"
 	@echo "make db-plan       Show configured database backup sources"
 	@echo "make dev           Install development tools into .venv"
@@ -97,3 +98,10 @@ backup-vl-test:
 restore-db:
 	@test -n "$(BACKUP)" || (echo "Set BACKUP to a snapshot directory"; exit 1)
 	@$(VENV_PYTHON) scripts/db_restore.py --backup "$(BACKUP)"
+
+.PHONY: tunnel tunnel-check
+tunnel:
+	@$(VENV_PYTHON) scripts/tunnel.py
+
+tunnel-check:
+	@$(VENV_PYTHON) scripts/tunnel.py --check
