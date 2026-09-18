@@ -350,6 +350,7 @@ def main():
     action.add_argument("--plan", action="store_true")
     action.add_argument("--all", action="store_true")
     action.add_argument("--limit", type=int)
+    action.add_argument("--image-id", help="Transfer one exact manifest image ID")
     args = parser.parse_args()
     if args.limit is not None and not 1 <= args.limit <= 100000:
         parser.error("Invalid limit")
@@ -394,6 +395,13 @@ def main():
             "Offline plan only. Local candidate contents and remote copies are not verified. No network calls."
         )
         return 0
+    selected = (
+        [item for item in plan["rows"] if item["id"] == args.image_id] if args.image_id else None
+    )
+    if args.image_id and len(selected) != 1:
+        print("Image ID not found uniquely in manifest. No network calls.")
+        return 1
+
     STOP.clear()
     lock = (project / ".local/download.lock").open("a")
     try:
@@ -412,7 +420,11 @@ def main():
     stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S%fZ")
     journal_path = project / "logs" / ("r2-" + stamp + ".jsonl")
     journal_path.parent.mkdir(exist_ok=True, mode=0o700)
-    chosen = plan["rows"] if args.all else plan["rows"][: args.limit]
+    chosen = (
+        selected
+        if selected is not None
+        else (plan["rows"] if args.all else plan["rows"][: args.limit])
+    )
     started = time.monotonic()
     counts = {"copied_verified": 0, "existing_verified": 0, "failed": 0, "stopped": 0}
     total_bytes = 0
