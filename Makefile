@@ -3,6 +3,8 @@ VENV_PYTHON := .venv/bin/python
 
 .PHONY: help setup deps check configure check-r2
 help:
+	@echo "make archive-plan  List other local archive candidates; no upload"
+	@echo "make db-plan       Show configured database backup sources"
 	@echo "make dev           Install development tools into .venv"
 	@echo "make ci            Run local checks and offline tests"
 	@echo "make r2-plan       Show the local R2 migration plan; no network"
@@ -77,3 +79,21 @@ check-public:
 
 ci: check check-public lint test
 	@$(VENV_PYTHON) -m pip check
+
+.PHONY: archive-plan db-plan backup-gc backup-vl-test
+archive-plan:
+	@$(VENV_PYTHON) scripts/archive_plan.py
+
+db-plan:
+	@$(VENV_PYTHON) scripts/db_backup.py --plan
+
+backup-gc:
+	@$(VENV_PYTHON) scripts/db_backup.py --name gc-local
+
+backup-vl-test:
+	@$(VENV_PYTHON) scripts/db_backup.py --name vl-test
+
+.PHONY: restore-db
+restore-db:
+	@test -n "$(BACKUP)" || (echo "Set BACKUP to a snapshot directory"; exit 1)
+	@$(VENV_PYTHON) scripts/db_restore.py --backup "$(BACKUP)"

@@ -322,3 +322,77 @@ tracked files, personal absolute paths, Cyrillic content and private-key blocks.
 They are a limited working-tree check, not a complete secret scanner.
 The workflow becomes active after it is committed and pushed. Requiring the
 `Python 3.14 checks` status before merge is a separate repository ruleset setting.
+
+## Next-stage archive and database preparation
+
+`make archive-plan` inventories explicitly configured folders from ignored
+`.local/archive.json`. The `sources` array contains `name`, absolute `root` and
+`include` (direct child folder names). It writes candidate metadata to
+`manifests/archive-candidates-*.json`; no hashes, uploads or deletion occur.
+Links are recorded, not followed. Recognized SQLite database/sidecar filenames
+are separated from ordinary archive files. Hidden/restricted entries are skipped
+using the inventory rules. This is a candidate list, not comprehensive content
+classification or a ready-to-upload archive. Overlapping sources are not deduplicated.
+
+`make db-plan` shows ignored `.local/databases.json` without database connections.
+That file contains a `databases` object mapping aliases to configurations. SQLite
+entries need `engine: sqlite`, `configured: true` and an absolute `path`. Local
+container PostgreSQL entries need `engine: postgres-container`, `configured: true`,
+`container`, `database`, `user` and integer `major`. No source is inferred from
+the mere existence of application migrations. Unconfirmed sources stay disabled.
+
+Run a selected backup with `scripts/db_backup.py --name <alias>` using the project
+interpreter. Prepared Make targets are `backup-gc` and `backup-vl-test`; the latter
+is explicitly a test database backup, not a product database migration.
+Backups and checksums stay under `.local/backups/<alias>/<timestamp>/`.
+
+SQLite uses the online backup API rather than copying a live database plus WAL.
+It checks snapshot integrity and foreign keys, copies the snapshot to a separate
+verification file, reopens it, compares table counts and SHA-256, then publishes
+the backup without replacing existing output. The verification copy is removed;
+failed partial backups are retained. Existing source data is not deleted.
+This establishes local snapshot readability, not application-level replay.
+
+PostgreSQL uses pg_dump from the configured existing local container and checks
+that client/server major versions match. It emits a custom-format dump and reads
+its catalog with pg_restore. This is NOT an actual restore proof. Database restore,
+roles/globals, extensions, ownership and final application checks remain separate
+work before deployment. No database or container is created or removed. No Railway
+operation, R2 upload or source database write is performed by these commands.
+
+Archive classification conservatively separates main SQLite filename extensions
+`.db`, `.sqlite`, `.sqlite3`, `.db3`, `.s3db`, `.sl3`, and all names ending in
+`-wal`, `-shm`, `-journal` or the hexadecimal super-journal pattern. Sidecars
+also identify their extensionless sibling main file. Case and directory nesting
+do not change classification. Name matching can overexclude ordinary files and
+cannot identify every arbitrary SQLite filename without content inspection.
+See [SQLite temporary files](https://www.sqlite.org/tempfiles.html) and
+[atomic commit](https://sqlite.org/atomiccommit.html).
+
+Archive candidates never authorize deletion: source-code references, document
+links and active dependencies are not analyzed. Database snapshots, a readable
+archive catalog, matching hashes and copied objects do not establish application
+operation after restart. The output marks these checks as not performed.
+Original sources remain until a separate exact deletion list is approved after
+restore, new-storage reads and restart tests without the old local source.
+
+## Isolated restore rehearsal
+
+`make restore-db BACKUP=/absolute/path/to/backup-directory` requires the snapshot
+and its verification.json. SQLite is restored to a fresh directory, reopened
+independently and compared against the snapshot. PostgreSQL is restored with
+pg_restore (not --list) into a newly named local container with no network or
+published ports. The same-major image must already exist locally; none is pulled.
+The default major is 17; the script accepts --major for another backup version.
+
+The PostgreSQL target is restarted, and sorted full table-row digests and counts
+are compared before and after restart. This is a local database rehearsal, not
+an application or Railway check. Ownership/ACL are deliberately excluded from
+this isolated test and must be mapped for the real destination. The new container
+is retained for inspection; no original container, database or file is deleted.
+No restore command overwrites an existing SQLite destination.
+
+Archive and database checks do not authorize cleanup. Required remaining gates
+are actual application reads from the new stores, restart with old data paths
+unavailable, preservation of active document/code references, and a separately
+approved file-by-file deletion list with byte totals. No deletion command exists.
