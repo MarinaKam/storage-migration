@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import db_backup as b
+from hash_support import sha256_of
 
 
 class BackupTests(unittest.TestCase):
@@ -31,7 +32,7 @@ class BackupTests(unittest.TestCase):
                 self.assertEqual(
                     restored.execute("SELECT * FROM rows").fetchall(), [(1, "retained")]
                 )
-            self.assertEqual(result["sha256"], b.digest(backup))
+            self.assertEqual(result["sha256"], sha256_of(backup).removeprefix("sha256:"))
             self.assertEqual(conn.execute("SELECT count(*) FROM rows").fetchone()[0], 1)
 
     def test_existing_destination_and_symlink_rejected(self):
