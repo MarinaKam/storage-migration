@@ -31,7 +31,6 @@ import json
 import os
 import signal
 import stat
-import sys
 import threading
 import time
 import warnings
@@ -176,12 +175,19 @@ def transfer_one(client, bucket, item, state_dir):
                 phase = "resume_readback"
                 remote = remote_digest(client, bucket, key, IMAGE_LIMIT)
                 if remote is not None and remote[0] == expected_sha:
-                    return {"key": key, "sha256": expected_sha, "status": "existing_verified", "bytes": remote[1]}
+                    return {
+                        "key": key,
+                        "sha256": expected_sha,
+                        "status": "existing_verified",
+                        "bytes": remote[1],
+                    }
         phase = "local_read"
         data = stable_bytes(Path(item["primary_local_path"]), IMAGE_LIMIT)
         real_sha = sha(data)
         if real_sha != expected_sha:
-            raise ConflictError(f"Local content changed since audit: expected {expected_sha}, got {real_sha}")
+            raise ConflictError(
+                f"Local content changed since audit: expected {expected_sha}, got {real_sha}"
+            )
         content_type = image_type(data)
         if STOP.is_set():
             raise InterruptedError()
@@ -235,8 +241,10 @@ def main():
     previous_handler = signal.signal(signal.SIGINT, stop)
     state_dir = project / ".local/r2-state" / "vl-image-upload-20260918"
     state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-    journal_path = project / "logs" / (
-        "vl-image-upload-" + time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + ".jsonl"
+    journal_path = (
+        project
+        / "logs"
+        / ("vl-image-upload-" + time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + ".jsonl")
     )
     journal_path.parent.mkdir(exist_ok=True, mode=0o700)
     chosen = items if args.all else items[: args.limit]
@@ -270,7 +278,7 @@ def main():
                 processed = sum(counts.values())
                 elapsed = int(time.monotonic() - started)
                 line = (
-                    f"{processed}/{len(chosen)} ({100 * processed / max(len(chosen),1):.1f}%) | copied {counts['copied_verified']}"
+                    f"{processed}/{len(chosen)} ({100 * processed / max(len(chosen), 1):.1f}%) | copied {counts['copied_verified']}"
                     f" | existing {counts['existing_verified']} | failed {counts['failed']}"
                     f" | verified {total_bytes / 1e6:.2f} MB | {elapsed // 60:02d}:{elapsed % 60:02d}"
                 )
@@ -279,7 +287,11 @@ def main():
         print("Journal: " + str(journal_path))
         return 130 if STOP.is_set() else (2 if counts["failed"] else 0)
     except Exception as error:  # noqa: BLE001
-        print("\nUpload stopped: " + type(error).__name__ + ". Existing objects and local photos were not overwritten.")
+        print(
+            "\nUpload stopped: "
+            + type(error).__name__
+            + ". Existing objects and local photos were not overwritten."
+        )
         return 1
     finally:
         signal.signal(signal.SIGINT, previous_handler)
